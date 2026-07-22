@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: voice-agent-dashboard
+    runtime: docker
+    rootDir: dashboard
+    plan: starter
+    envVars:
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+    disk:
+      name: dashboard-data
+      mountPath: /data
+      sizeGB: 1
+
+  - type: worker
+    name: voice-calling-agent
+    runtime: docker
+    rootDir: voice-agent
+    # NOTE: Render's GPU plans are limited; for the vLLM-served fine-tuned
+    # model, a paid GPU plan (or Railway GPU) is required. This worker service
+    # itself is lightweight (STT/TTS/orchestration only) and can run on a
+    # standard plan as long as it points DASHBOARD_WEBHOOK_URL and the LLM
+    # base_url at the actual vLLM host once that's deployed.
+    plan: starter
+    envVars:
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: OLLAMA_BASE_URL
+        sync: false
+      - key: OLLAMA_API_KEY
+        sync: false
+      - key: DASHBOARD_WEBHOOK_URL
+        fromService:
+          type: web
+          name: voice-agent-dashboard
+          property: host

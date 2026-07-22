@@ -1,0 +1,28 @@
+# Docker ignore file to reduce image size
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+*.egg
+*.dist-info
+*.whl
+*.log
+*.md
+*.txt
+*.ipynb
+.env
+.env.local
+*.DS_Store
+.vscode
+.idea
+node_modules
+tests
+docs
+examples
+*~
+# Exclude large model files (they will be mounted via volumes)
+voices/
+models/

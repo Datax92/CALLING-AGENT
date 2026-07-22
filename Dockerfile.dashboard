@@ -1,0 +1,42 @@
+# Multi-stage Dockerfile for dashboard component
+
+# Stage 1: Build the dashboard component
+FROM python:3.9-slim as builder
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+WORKDIR /app
+COPY requirements-dashboard.txt ./
+RUN pip install --no-cache-dir -r requirements-dashboard.txt
+
+# Copy application code
+COPY . .
+
+# Stage 2: Create the final image
+FROM python:3.9-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy from builder stage
+COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /app /app
+
+# Set working directory
+WORKDIR /app
+
+# Expose ports
+EXPOSE 8000
+
+# Set environment variables
+ENV PYTHONPATH=/app \
+    MONGO_URI=mongodb://mongo:27017/voicebot \
+    DASHBOARD_WEBHOOK_URL=http://localhost:8000/webhook/call-summary
+
+# Start the dashboard
+CMD python app.py

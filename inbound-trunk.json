@@ -1,0 +1,7 @@
+{
+  "trunk": {
+    "name": "PTCL Inbound Trunk for LiveKit",
+    "numbers": ["+923000000000"],
+    "krisp_enabled": true
+  }
+}

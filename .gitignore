@@ -1,0 +1,54 @@
+.env.local
+.env
+__pycache__/
+*.pyc
+.venv/
+*.wav
+*.log
+.DS_Store
+.env.example
+
+# Secrets / env
+.env
+.env.local
+.env.example   # keep only a placeholder version, not real values
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Byte‑code caches
+__pycache__/
+*.py[cod]
+
+# Large model / data assets
+voices/
+models/
+*.onnx
+*.bin
+*.pt
+*.safetensors
+
+# Audio recordings / media
+*.wav
+*.mp3
+recordings/
+outputs/
+
+# Log files
+*.log
+logs/
+
+# OS/IDE artefacts
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Docker temporary files (if any)
+docker_build/

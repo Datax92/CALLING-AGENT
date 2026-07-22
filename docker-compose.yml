@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # MongoDB service
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: voicebot
+
+  # Dashboard service
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: dashboard
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+    environment:
+      MONGO_URI: mongodb://mongo:27017/voicebot
+      DASHBOARD_WEBHOOK_URL: http://localhost:8000/webhook/call-summary
+
+  # Voice agent service
+  voice-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.voice
+    container_name: voice-agent
+    restart: always
+    ports:
+      - "8001:8001"
+    depends_on:
+      - mongo
+      - dashboard
+    environment:
+      VLLM_BASE_URL: http://vllm-server:8000
+      PIPER_MODEL_PATH: /app/voices/ur_PK-fasih-medium.onnx
+      DASHBOARD_WEBHOOK_URL: http://dashboard:8000/webhook/call-summary
+
+  # vLLM server (mock for now)
+  vllm-server:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-server
+    restart: always
+    ports:
+      - "8002:8000"
+    environment:
+      MODEL: qwen3.5-4b-urdu-vllm
+
+volumes:
+  mongo_data:

@@ -1,0 +1,20 @@
+{
+  "name": "twilio-inbound-dynamic-room",
+  "trunk_ids": ["PTCL_INBOUND_TRUNK"],
+  "rule": {
+    "dispatchRuleIndividual": {
+      "roomPrefix": "coldcall-"
+    }
+  },
+  "roomConfig": {
+    "agents": [
+      {
+        "agentName": "calling-agent"
+      }
+    ]
+  },
+  "metadata": {
+    "allowed_from": "PTCL",
+    "notes": "Incoming PTCL webhooks are validated and caller ID is filtered in app webhook."
+  }
+}

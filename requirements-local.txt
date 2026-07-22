@@ -1,0 +1,10 @@
+livekit-agents==1.6.5
+livekit-plugins-deepgram==1.6.4
+requests==2.34.2
+soundfile==0.14.0
+python-dotenv==1.2.2
+piper-tts==1.4.2
+psutil==7.0.0
+apscheduler==3.10.4
+fastapi==0.110.0
+uvicorn==0.29.0
