@@ -27,9 +27,6 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up MongoDB
-RUN apt-get update && apt-get install -y mongodb-org
-
 # Create directories
 RUN mkdir -p /data/db /data/configdb
 
