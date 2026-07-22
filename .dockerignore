@@ -1,6 +1,10 @@
-# Docker ignore file to reduce image size
+# Docker ignore file — keep the build context lean and fast
+
+# Git / version control
 .git
 .gitignore
+
+# Python caches
 __pycache__
 *.pyc
 *.pyo
@@ -9,22 +13,40 @@ __pycache__
 *.egg
 *.dist-info
 *.whl
+
+# Logs
 *.log
+logs/
+
+# Documentation / notebooks (not needed at runtime)
 *.md
-# Exclude generic text files, but keep requirement files for Docker builds
-*.txt
-!requirements-*.txt
 *.ipynb
+
+# Environment files (secrets live in Railway environment variables)
 .env
 .env.local
-*.DS_Store
+*.env*
+
+# OS / editor metadata
+.DS_Store
 .vscode
 .idea
 node_modules
-tests
-docs
-examples
 *~
-# Exclude large model files (they will be mounted via volumes)
+
+# Virtual environments
+.venv
+venv/
+env/
+
+# Large model / data directories — mounted as volumes at runtime
 voices/
 models/
+
+# Test / development folders
+tests/
+docs/
+examples/
+
+# Docker build artefacts
+docker_build/
