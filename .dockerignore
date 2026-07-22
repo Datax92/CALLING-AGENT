@@ -11,7 +11,9 @@ __pycache__
 *.whl
 *.log
 *.md
+# Exclude generic text files, but keep requirement files for Docker builds
 *.txt
+!requirements-*.txt
 *.ipynb
 .env
 .env.local
