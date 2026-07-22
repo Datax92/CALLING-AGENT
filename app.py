@@ -56,7 +56,8 @@ async def lifespan(app: FastAPI):
     settings = Settings()
     client = AsyncIOMotorClient(
         settings.mongodb_uri,
-        tlsCAFile=certifi.where()
+        tlsCAFile=certifi.where(),
+        tlsAllowInvalidCertificates=True
     )
     db = client["voice_agent_db"]
     calls = db["calls"]
