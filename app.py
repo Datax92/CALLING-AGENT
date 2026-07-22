@@ -8,6 +8,7 @@ from fastapi import FastAPI, Form, Request, Depends, HTTPException, status, Resp
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
@@ -53,7 +54,10 @@ URDU_RANGE_RE = re.compile(r"[\u0600-\u06FF]")
 async def lifespan(app: FastAPI):
     # Validate configuration at startup
     settings = Settings()
-    client = AsyncIOMotorClient(settings.mongodb_uri)
+    client = AsyncIOMotorClient(
+        settings.mongodb_uri,
+        tlsCAFile=certifi.where()
+    )
     db = client["voice_agent_db"]
     calls = db["calls"]
 
