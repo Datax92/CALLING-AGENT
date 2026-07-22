@@ -21,6 +21,11 @@ import json
 # from sip_bridge import router as sip_bridge_router
 # app.include_router(sip_bridge_router)
 
+# Mount static files directory (ensure it exists)
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 # Configuration via Pydantic BaseSettings
 class Settings(BaseSettings):
     mongodb_uri: str = Field("mongodb://localhost:27017", env="MONGODB_URI")
@@ -76,7 +81,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AI Voice Calling Agent - Approval Dashboard", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 # Optional: serve static files if a static directory exists
-app.mount("/static", StaticFiles(directory="static"), name="static")
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 def notify_slack(call_id: str, summary: dict):
