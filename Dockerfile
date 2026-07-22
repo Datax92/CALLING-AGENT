@@ -46,5 +46,5 @@ ENV PYTHONPATH=/app \
     MONGO_URI=mongodb://localhost:27017/voicebot \
     DASHBOARD_WEBHOOK_URL=http://localhost:8000/webhook/call-summary
 
-# Start MongoDB and the application
-CMD uvicorn app:app --host 0.0.0.0 --port 8000
+# Start the application
+CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

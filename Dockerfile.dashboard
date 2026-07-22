@@ -35,4 +35,4 @@ ENV PYTHONPATH=/app \
     DASHBOARD_WEBHOOK_URL=${DASHBOARD_WEBHOOK_URL}
 
 # Start the dashboard
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
