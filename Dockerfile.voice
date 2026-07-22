@@ -1,10 +1,10 @@
 # Multi-stage Dockerfile for voice agent component
 
 # Stage 1: Build the voice agent component
-FROM python:3.9-slim as builder
+FROM python:3.12-slim as builder
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ffmpeg \
     libsndfile1 \
@@ -19,19 +19,16 @@ RUN pip install --no-cache-dir -r requirements-voice.txt
 COPY . .
 
 # Stage 2: Create the final image
-FROM python:3.9-slim
+FROM python:3.12-slim
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Download Piper TTS voice
-RUN python3 -m piper.download_voices ur_PK-fasih-medium --data-dir /app/voices --download-dir /app/voices
-
 # Copy from builder stage
-COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /app /app
 
 # Set working directory
@@ -42,8 +39,8 @@ EXPOSE 8001
 
 # Set environment variables
 ENV PYTHONPATH=/app \
-    VLLM_BASE_URL=http://vllm-server:8000 \
+    VLLM_BASE_URL=${VLLM_BASE_URL} \
     PIPER_MODEL_PATH=/app/voices/ur_PK-fasih-medium.onnx
 
 # Start the voice agent
-CMD python agent.py
+CMD ["python", "agent.py"]

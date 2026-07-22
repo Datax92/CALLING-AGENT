@@ -27,11 +27,12 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create directories
-RUN mkdir -p /data/db /data/configdb
+# Remove database initialization – MongoDB runs as a managed service
+# (no need to create local data directories)
+
 
 # Copy from builder stage
-COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /app /app
 
 # Set working directory
@@ -46,5 +47,4 @@ ENV PYTHONPATH=/app \
     DASHBOARD_WEBHOOK_URL=http://localhost:8000/webhook/call-summary
 
 # Start MongoDB and the application
-CMD mongod --fork --logpath /var/log/mongod.log && \
-    python app.py
+CMD uvicorn app:app --host 0.0.0.0 --port 8000
