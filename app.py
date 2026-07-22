@@ -2,8 +2,7 @@ import os
 import re
 import time
 from contextlib import asynccontextmanager
-
-from contextlib import asynccontextmanager
+from pathlib import Path
 from bson import ObjectId
 from fastapi import FastAPI, Form, Request, Depends, HTTPException, status, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -20,11 +19,6 @@ import json
 # Re-add once PTCL SIP trunk is configured:
 # from sip_bridge import router as sip_bridge_router
 # app.include_router(sip_bridge_router)
-
-# Mount static files directory (ensure it exists)
-static_dir = Path(__file__).parent / "static"
-static_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Configuration via Pydantic BaseSettings
 class Settings(BaseSettings):
@@ -211,6 +205,18 @@ def render_card(doc) -> str:
     timeline = doc.get("timeline") or "\u2014"
     caller = doc.get("caller_number") or "\u2014"
 
+    # Render recording player if URL exists
+    recording_player_html = ""
+    if doc.get("recording_url"):
+        recording_player_html = f'''
+        <div class="recording-player">
+            <h4>Call Recording</h4>
+            <audio controls>
+                <source src="{doc["recording_url"]}" type="audio/wav">
+            </audio>
+        </div>
+        '''
+
     return f"""
     <article class="card" data-status="{status}">
         <header class="card-head">
@@ -225,7 +231,7 @@ def render_card(doc) -> str:
             <dl class="deal-terms">
                 <div>
                     <dt>Business Name</dt>
-                    <dd>{business_name}</dd>
+                    <dd>{doc.get('business_name', '')}</dd>
                 </div>
                 <div>
                     <dt>Project</dt>
@@ -241,23 +247,23 @@ def render_card(doc) -> str:
                 </div>
                 <div>
                     <dt>Email</dt>
-                    <dd class="mono">{email}</dd>
+                    <dd class="mono">{doc.get('email', '')}</dd>
                 </div>
                 <div>
                     <dt>Phone</dt>
-                    <dd class="mono">{phone}</dd>
+                    <dd class="mono">{doc.get('phone_number', '')}</dd>
                 </div>
                 <div>
                     <dt>WhatsApp</dt>
-                    <dd class="mono">{whatsapp}</dd>
+                    <dd class="mono">{doc.get('whatsapp_number', '')}</dd>
                 </div>
                 <div>
                     <dt>Call Duration</dt>
-                    <dd class="mono">{call_duration}</dd>
+                    <dd class="mono">{doc.get('call_duration', '')}</dd>
                 </div>
             </dl>
             <p class="summary" {summary_attrs}>{summary_text}</p>
-            {recording_player}
+            {recording_player_html}
         </div>
 
         {actions}
