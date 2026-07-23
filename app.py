@@ -8,6 +8,7 @@ from fastapi import FastAPI, Form, Request, Depends, HTTPException, status, Resp
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+import ssl
 import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
@@ -54,10 +55,13 @@ URDU_RANGE_RE = re.compile(r"[\u0600-\u06FF]")
 async def lifespan(app: FastAPI):
     # Validate configuration at startup
     settings = Settings()
+    # Force TLS 1.2 to avoid TLSv1_ALERT_INTERNAL_ERROR with MongoDB Atlas
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+    ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+    ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
     client = AsyncIOMotorClient(
         settings.mongodb_uri,
-        tlsCAFile=certifi.where(),
-        tlsAllowInvalidCertificates=True
+        ssl_context=ssl_context,
     )
     db = client["voice_agent_db"]
     calls = db["calls"]
