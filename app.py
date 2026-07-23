@@ -17,12 +17,6 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
-# NOTE: sip_bridge is intentionally NOT wired in for this local test run.
-# Re-add once PTCL SIP trunk is configured:
-# from sip_bridge import router as sip_bridge_router
-# app.include_router(sip_bridge_router)
-
-
 # Configuration via Pydantic BaseSettings
 class Settings(BaseSettings):
     mongodb_uri: str = Field("mongodb://localhost:27017", env="MONGODB_URI")
@@ -54,10 +48,9 @@ URDU_RANGE_RE = re.compile(r"[\u0600-\u06FF]")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Validate configuration at startup
     app_settings = Settings()
     
-    # Correct AsyncIOMotorClient TLS options (no invalid ssl_context kwarg)
+    # Motor/PyMongo Async Client with Certifi SSL handling
     client = AsyncIOMotorClient(
         app_settings.mongodb_uri,
         tls=True,
@@ -111,22 +104,23 @@ def notify_slack(call_id: str, summary: dict):
         )
         urllib.request.urlopen(req, timeout=5)
     except Exception:
-        # Never let a notification failure break the webhook itself
         pass
 
 
 @app.post("/webhook/call-summary")
+@app.post("/webhook/lead")
 async def receive_call_summary(summary: CallSummary, request: Request):
     """
-    The agent's submit_call_summary tool POSTs here with a structured JSON
-    summary at the end of a call. FastAPI automatically validates the payload
-    against the CallSummary model.
+    Accepts call summary payloads from both agent webhooks (/webhook/call-summary and /webhook/lead).
     """
     rag_snippet = ""
     if summary.transcript_summary:
-        from rag_utils import RAGUtils
-        rag_utils = RAGUtils()
-        rag_snippet = rag_utils.filtered_lookup(summary.transcript_summary) or ""
+        try:
+            from rag_utils import RAGUtils
+            rag_utils = RAGUtils()
+            rag_snippet = rag_utils.filtered_lookup(summary.transcript_summary) or ""
+        except Exception:
+            rag_snippet = ""
 
     doc = {
         "caller_number": summary.caller_number,
@@ -525,6 +519,7 @@ PAGE_SCRIPT = """
     let hasMore = true;
 
     function applyFilter() {
+        if (!grid) return;
         const cards = grid.querySelectorAll('.card');
         let visible = 0;
         cards.forEach(c => {
@@ -542,6 +537,7 @@ PAGE_SCRIPT = """
     }
 
     function updateCounts() {
+        if (!grid) return;
         const cards = grid.querySelectorAll('.card');
         const counts = { all: cards.length, pending: 0, approved: 0, rejected: 0, renegotiate: 0 };
         cards.forEach(c => { counts[c.dataset.status] = (counts[c.dataset.status] || 0) + 1; });
@@ -556,7 +552,7 @@ PAGE_SCRIPT = """
         try {
             const res = await fetch(`/api/deals?skip=${skip}&limit=50`);
             const data = await res.json();
-            if (data.html) {
+            if (data.html && grid) {
                 grid.insertAdjacentHTML('beforeend', data.html);
                 skip = data.skip;
                 hasMore = data.has_more;
@@ -567,6 +563,7 @@ PAGE_SCRIPT = """
     }
 
     function setupInfiniteScroll() {
+        if (!grid) return;
         const observer = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting && hasMore) {
                 loadMore();
@@ -589,7 +586,7 @@ PAGE_SCRIPT = """
         const eventSource = new EventSource('/events/deals');
         eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            if (data.html) {
+            if (data.html && grid) {
                 grid.innerHTML = data.html;
                 skip = data.skip;
                 hasMore = data.has_more;
@@ -598,12 +595,12 @@ PAGE_SCRIPT = """
             }
         };
         eventSource.onerror = () => {
-            console.warn("SSE connection lost; falling back to polling.");
             setInterval(poll, 8000);
         };
     }
 
     function poll() {
+        if (!grid) return;
         fetch('/api/deals').then(res => res.json()).then(data => {
             if (data.html !== grid.dataset.lastHtml) {
                 grid.dataset.lastHtml = data.html;
@@ -634,6 +631,22 @@ def _render_cards_html(docs) -> str:
     )
 
 
+@app.get("/events/deals")
+async def events_deals(request: Request):
+    """
+    Server-Sent Events (SSE) endpoint to notify the browser dashboard when updates occur.
+    """
+    async def event_generator():
+        while True:
+            if await request.is_disconnected():
+                break
+            # Stream heartbeat ping every 15 seconds
+            yield f"data: {json.dumps({'type': 'ping'})}\n\n"
+            await asyncio.sleep(15)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 @app.get("/api/deals")
 async def api_deals(skip: int = 0, limit: int = 50):
     cursor = app.state.calls.find().sort("created_at", -1).skip(skip).limit(limit + 1)
@@ -647,12 +660,11 @@ async def api_deals(skip: int = 0, limit: int = 50):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):  # <--- 1. Add request: Request parameter here
+async def dashboard(request: Request):
     cursor = app.state.calls.find().sort("created_at", -1).limit(50)
     docs = await cursor.to_list(length=50)
     cards_html = _render_cards_html(docs)
 
-    # 2. Pass request=request cleanly
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
