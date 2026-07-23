@@ -1,19 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-    {{ PAGE_SHELL_HEAD }}
+    {{ PAGE_SHELL_HEAD | safe }}
 </head>
 <body>
     <header class="top">
         <div class="top-inner">
             <h1>Deal Approvals</h1>
             <p class="tagline">No agreement reaches a client until you accept it here.</p>
-            {{ filter_bar }}
+            {{ filter_bar | safe }}
         </div>
     </header>
     <main>
-        <div id="deal-grid" data-last-html="">{{ cards_html }}</div>
+        <div id="deal-grid" data-last-html="">
+            {{ cards_html | safe }}
+        </div>
     </main>
-    {{ PAGE_SCRIPT }}
+    {{ PAGE_SCRIPT | safe }}
 </body>
 </html>
