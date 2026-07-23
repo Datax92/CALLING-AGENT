@@ -647,15 +647,16 @@ async def api_deals(skip: int = 0, limit: int = 50):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard():
+async def dashboard(request: Request):  # <--- 1. Add request: Request parameter here
     cursor = app.state.calls.find().sort("created_at", -1).limit(50)
     docs = await cursor.to_list(length=50)
     cards_html = _render_cards_html(docs)
 
+    # 2. Pass request=request cleanly
     return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": Request,
+        request=request,
+        name="dashboard.html",
+        context={
             "cards_html": cards_html,
             "skip": 50,
             "has_more": len(docs) == 50,
