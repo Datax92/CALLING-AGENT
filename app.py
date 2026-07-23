@@ -3,24 +3,25 @@ import re
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional, List, AsyncGenerator
+import asyncio
+import json
+
 from bson import ObjectId
 from fastapi import FastAPI, Form, Request, Depends, HTTPException, status, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import ssl
 import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
-from typing import Optional, List, AsyncGenerator
-import asyncio
-import json
 
 # NOTE: sip_bridge is intentionally NOT wired in for this local test run.
 # Re-add once PTCL SIP trunk is configured:
 # from sip_bridge import router as sip_bridge_router
 # app.include_router(sip_bridge_router)
+
 
 # Configuration via Pydantic BaseSettings
 class Settings(BaseSettings):
@@ -54,14 +55,13 @@ URDU_RANGE_RE = re.compile(r"[\u0600-\u06FF]")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Validate configuration at startup
-    settings = Settings()
-    # Force TLS 1.2 to avoid TLSv1_ALERT_INTERNAL_ERROR with MongoDB Atlas
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-    ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-    ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
+    app_settings = Settings()
+    
+    # Correct AsyncIOMotorClient TLS options (no invalid ssl_context kwarg)
     client = AsyncIOMotorClient(
-        settings.mongodb_uri,
-        ssl_context=ssl_context,
+        app_settings.mongodb_uri,
+        tls=True,
+        tlsCAFile=certifi.where(),
     )
     db = client["voice_agent_db"]
     calls = db["calls"]
@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
     await calls.create_index("status")
     await calls.create_index("caller_number")
 
-    app.state.settings = settings
+    app.state.settings = app_settings
     app.state.mongo_client = client
     app.state.calls = calls
     try:
@@ -83,7 +83,8 @@ async def lifespan(app: FastAPI):
 # Initialize FastAPI with Jinja2 templates
 app = FastAPI(title="AI Voice Calling Agent - Approval Dashboard", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
-# Optional: serve static files if a static directory exists
+
+# Mount static files directory safely
 static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
@@ -91,10 +92,10 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 def notify_slack(call_id: str, summary: dict):
     """Optional: pings Slack when a new call summary lands. Safe no-op if not configured."""
-    if not SLACK_WEBHOOK_URL:
+    webhook_url = settings.slack_webhook_url
+    if not webhook_url:
         return
     try:
-        import json
         import urllib.request
 
         text = (
@@ -106,7 +107,7 @@ def notify_slack(call_id: str, summary: dict):
         )
         data = json.dumps({"text": text}).encode("utf-8")
         req = urllib.request.Request(
-            SLACK_WEBHOOK_URL, data=data, headers={"Content-Type": "application/json"}
+            webhook_url, data=data, headers={"Content-Type": "application/json"}
         )
         urllib.request.urlopen(req, timeout=5)
     except Exception:
@@ -121,7 +122,6 @@ async def receive_call_summary(summary: CallSummary, request: Request):
     summary at the end of a call. FastAPI automatically validates the payload
     against the CallSummary model.
     """
-    # Optional: perform filtered RAG lookup on transcript_summary and store the snippet.
     rag_snippet = ""
     if summary.transcript_summary:
         from rag_utils import RAGUtils
@@ -214,7 +214,6 @@ def render_card(doc) -> str:
     timeline = doc.get("timeline") or "\u2014"
     caller = doc.get("caller_number") or "\u2014"
 
-    # Render recording player if URL exists
     recording_player_html = ""
     if doc.get("recording_url"):
         recording_player_html = f'''
@@ -395,7 +394,6 @@ PAGE_SHELL_HEAD = """
         .st-rejected { background: var(--reject-bg); color: var(--reject); }
         .st-renegotiate { background: var(--renegotiate-bg); color: var(--renegotiate); }
 
-        /* Signature element: small waveform pulse for calls awaiting a decision */
         .pulse { display: inline-flex; align-items: flex-end; gap: 2px; height: 9px; }
         .pulse span {
             width: 2px;
@@ -587,7 +585,6 @@ PAGE_SCRIPT = """
         applyFilter();
     }));
 
-    // Replace polling with Server-Sent Events for real-time updates
     function setupSSE() {
         const eventSource = new EventSource('/events/deals');
         eventSource.onmessage = (event) => {
@@ -651,7 +648,6 @@ async def api_deals(skip: int = 0, limit: int = 50):
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
-    # Initial load: fetch first 50 calls
     cursor = app.state.calls.find().sort("created_at", -1).limit(50)
     docs = await cursor.to_list(length=50)
     cards_html = _render_cards_html(docs)
@@ -675,13 +671,11 @@ async def decide(call_id: str, request: Request, action: str = Form(...)):
     if action not in ("approve", "reject", "renegotiate"):
         return RedirectResponse(url="/", status_code=303)
 
-    status = {"approve": "approved", "reject": "rejected", "renegotiate": "renegotiate"}[action]
+    status_val = {"approve": "approved", "reject": "rejected", "renegotiate": "renegotiate"}[action]
 
     await request.app.state.calls.update_one(
-        {"_id": ObjectId(call_id)}, {"$set": {"status": status}}
+        {"_id": ObjectId(call_id)}, {"$set": {"status": status_val}}
     )
-    # TODO: once approved, trigger actual contract/email generation here.
-    # TODO: once renegotiate, notify Talha's model/dashboard to re-open the deal terms.
     return RedirectResponse(url="/", status_code=303)
 
 
